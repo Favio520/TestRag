@@ -15,3 +15,7 @@ unstructured>=0.15.0,<1.0.0
 
 # Dependencia recomendada para parseo markdown en unstructured
 markdown>=3.6,<4.0
+
+# API para conectar con OpenClaw
+fastapi>=0.115.0,<1.0.0
+uvicorn>=0.30.0,<1.0.0
