@@ -42,7 +42,7 @@ TOP_K_DEFAULT = 4
 BATCH_SIZE = 128
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".docx", ".md"}
 MANIFEST_FILENAME = "data_manifest.json"
-SEARCH_TYPE_DEFAULT = "mmr"
+SEARCH_TYPE_DEFAULT = "similarity_with_score"
 MMR_FETCH_K_MULTIPLIER = 4
 MMR_LAMBDA_MULT = 0.7
 

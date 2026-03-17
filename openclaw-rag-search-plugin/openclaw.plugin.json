@@ -28,7 +28,7 @@
       "searchType": {
         "type": "string",
         "enum": ["mmr", "similarity", "similarity_with_score"],
-        "default": "mmr",
+        "default": "similarity_with_score",
         "description": "Estrategia de recuperacion. MMR reduce fragmentos repetidos."
       },
       "chunkSize": {

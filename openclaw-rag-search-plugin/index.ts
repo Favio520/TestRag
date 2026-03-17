@@ -14,7 +14,7 @@ const DEFAULT_CONFIG: PluginConfig = {
   baseUrl: "http://127.0.0.1:8000",
   timeoutMs: 30000,
   topK: 4,
-  searchType: "mmr",
+  searchType: "similarity_with_score",
   chunkSize: 900,
   chunkOverlap: 180
 };
