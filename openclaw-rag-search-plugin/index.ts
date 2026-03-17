@@ -5,18 +5,36 @@ type PluginConfig = {
   baseUrl: string;
   timeoutMs: number;
   topK: number;
+  searchType: "mmr" | "similarity" | "similarity_with_score";
+  chunkSize: number;
+  chunkOverlap: number;
 };
 
 const DEFAULT_CONFIG: PluginConfig = {
   baseUrl: "http://127.0.0.1:8000",
   timeoutMs: 30000,
-  topK: 3
+  topK: 4,
+  searchType: "mmr",
+  chunkSize: 900,
+  chunkOverlap: 180
 };
 
 function clampTopK(value: unknown, fallback: number): number {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(1, Math.min(10, Math.trunc(n)));
+}
+
+function clampChunkSize(value: unknown, fallback: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(100, Math.min(4000, Math.trunc(n)));
+}
+
+function clampChunkOverlap(value: unknown, fallback: number, chunkSize: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.min(chunkSize - 1, Math.trunc(n)));
 }
 
 function resolveConfig(api: any): PluginConfig {
@@ -27,6 +45,13 @@ function resolveConfig(api: any): PluginConfig {
       : {};
   const baseUrlRaw = raw.baseUrl;
   const timeoutRaw = raw.timeoutMs;
+  const searchTypeRaw = raw.searchType;
+  const chunkSize = clampChunkSize(raw.chunkSize, DEFAULT_CONFIG.chunkSize);
+  const chunkOverlap = clampChunkOverlap(raw.chunkOverlap, DEFAULT_CONFIG.chunkOverlap, chunkSize);
+  const searchType =
+    searchTypeRaw === "similarity" || searchTypeRaw === "similarity_with_score" || searchTypeRaw === "mmr"
+      ? searchTypeRaw
+      : DEFAULT_CONFIG.searchType;
   return {
     baseUrl: typeof baseUrlRaw === "string" && baseUrlRaw.trim()
       ? baseUrlRaw.trim()
@@ -34,11 +59,24 @@ function resolveConfig(api: any): PluginConfig {
     timeoutMs: Number.isFinite(Number(timeoutRaw))
       ? Math.max(1000, Math.min(120000, Number(timeoutRaw)))
       : DEFAULT_CONFIG.timeoutMs,
-    topK: clampTopK(raw.topK, DEFAULT_CONFIG.topK)
+    topK: clampTopK(raw.topK, DEFAULT_CONFIG.topK),
+    searchType,
+    chunkSize,
+    chunkOverlap
   };
 }
 
-function formatResults(results: Array<{ content: string; source?: string; chunk_id?: number | string }>): string {
+function formatResults(results: Array<{
+  content: string;
+  source?: string;
+  source_name?: string;
+  title?: string;
+  doc_type?: string;
+  section?: string;
+  page_start?: number;
+  page_end?: number;
+  chunk_id?: number | string;
+}>): string {
   if (!results.length) {
     return "No se encontraron fragmentos relevantes.";
   }
@@ -46,8 +84,21 @@ function formatResults(results: Array<{ content: string; source?: string; chunk_
   const lines: string[] = [];
   results.forEach((item, idx) => {
     const source = item.source ?? "desconocido";
+    const sourceName = item.source_name ?? source;
     const chunk = item.chunk_id ?? "n/a";
-    lines.push(`[${idx + 1}] Fuente: ${source} | Chunk: ${chunk}`);
+    const metaParts = [
+      `Fuente: ${sourceName}`,
+      item.title ? `Titulo: ${item.title}` : null,
+      item.doc_type ? `Tipo: ${item.doc_type}` : null,
+      item.section ? `Seccion: ${item.section}` : null,
+      item.page_start
+        ? item.page_end && item.page_end !== item.page_start
+          ? `Paginas: ${item.page_start}-${item.page_end}`
+          : `Pagina: ${item.page_start}`
+        : null,
+      `Chunk: ${chunk}`
+    ].filter(Boolean);
+    lines.push(`[${idx + 1}] ${metaParts.join(" | ")}`);
     lines.push(item.content);
     lines.push("---");
   });
@@ -104,7 +155,10 @@ export default function register(api: any) {
           body: JSON.stringify({
             query,
             top_k: topK,
-            rebuild
+            rebuild,
+            search_type: cfg.searchType,
+            chunk_size: cfg.chunkSize,
+            chunk_overlap: cfg.chunkOverlap
           }),
           signal: controller.signal
         });
