@@ -24,6 +24,26 @@
         "maximum": 10,
         "default": 3,
         "description": "Numero de fragmentos por defecto."
+      },
+      "searchType": {
+        "type": "string",
+        "enum": ["mmr", "similarity", "similarity_with_score"],
+        "default": "mmr",
+        "description": "Estrategia de recuperacion. MMR reduce fragmentos repetidos."
+      },
+      "chunkSize": {
+        "type": "integer",
+        "minimum": 100,
+        "maximum": 4000,
+        "default": 900,
+        "description": "Tamano de chunk para indexacion."
+      },
+      "chunkOverlap": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 1000,
+        "default": 180,
+        "description": "Solapamiento entre chunks consecutivos."
       }
     }
   }

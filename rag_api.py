@@ -8,7 +8,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from rag_system import TOP_K_DEFAULT, retrieve_top_fragments
+from rag_system import CHUNK_OVERLAP, CHUNK_SIZE, SEARCH_TYPE_DEFAULT, TOP_K_DEFAULT, retrieve_top_fragments
 
 
 logging.basicConfig(
@@ -29,6 +29,9 @@ class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Consulta del usuario.")
     top_k: int = Field(default=TOP_K_DEFAULT, ge=1, le=10)
     rebuild: bool = False
+    search_type: str = Field(default=SEARCH_TYPE_DEFAULT, pattern="^(mmr|similarity|similarity_with_score)$")
+    chunk_size: int = Field(default=CHUNK_SIZE, ge=100, le=4000)
+    chunk_overlap: int = Field(default=CHUNK_OVERLAP, ge=0, le=1000)
     data_dir: str = "data"
     index_dir: str = "faiss_index"
 
@@ -37,6 +40,12 @@ class SearchResult(BaseModel):
     content: str
     source: str
     chunk_id: int | str
+    source_name: str | None = None
+    title: str | None = None
+    doc_type: str | None = None
+    section: str | None = None
+    page_start: int | None = None
+    page_end: int | None = None
 
 
 class SearchResponse(BaseModel):
@@ -69,6 +78,9 @@ def search(request: SearchRequest) -> SearchResponse:
             index_dir=request.index_dir,
             top_k=request.top_k,
             rebuild=request.rebuild,
+            search_type=request.search_type,
+            chunk_size=request.chunk_size,
+            chunk_overlap=request.chunk_overlap,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -83,6 +95,12 @@ def search(request: SearchRequest) -> SearchResponse:
             content=doc.page_content,
             source=str(doc.metadata.get("source", "desconocido")),
             chunk_id=doc.metadata.get("chunk_id", "n/a"),
+            source_name=doc.metadata.get("source_name"),
+            title=doc.metadata.get("title"),
+            doc_type=doc.metadata.get("doc_type"),
+            section=doc.metadata.get("section"),
+            page_start=doc.metadata.get("page_start"),
+            page_end=doc.metadata.get("page_end"),
         )
         for doc in docs
     ]
