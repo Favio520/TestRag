@@ -29,7 +29,9 @@ openclaw plugins install -l D:\RAG\openclaw-rag-search-plugin
 
 ## 3) Configurar plugin
 
-```bat
+### Windows / PowerShell
+
+```powershell
 openclaw config set plugins.entries.rag-search.enabled true --strict-json
 openclaw config set plugins.entries.rag-search.config.baseUrl http://127.0.0.1:8000
 openclaw config set plugins.entries.rag-search.config.topK 3 --strict-json
@@ -43,12 +45,42 @@ openclaw config set plugins.allow[0] rag-search
 
 Nota PowerShell: usa comillas simples `'...'` para JSON.
 
+### Ubuntu / bash
+
+En bash, los corchetes `[]` pueden ser interpretados por el shell. Pon la ruta completa entre comillas simples:
+
+```bash
+openclaw config set 'plugins.entries.rag-search.enabled' true --strict-json
+openclaw config set 'plugins.entries.rag-search.config.baseUrl' http://127.0.0.1:8000
+openclaw config set 'plugins.entries.rag-search.config.topK' 3 --strict-json
+openclaw config set 'plugins.entries.rag-search.config.timeoutMs' 30000 --strict-json
+openclaw config set 'plugins.entries.rag-search.config.searchType' mmr
+openclaw config set 'plugins.entries.rag-search.config.chunkSize' 900 --strict-json
+openclaw config set 'plugins.entries.rag-search.config.chunkOverlap' 180 --strict-json
+openclaw config set 'plugins.allow[0]' rag-search
+```
+
 ## 4) Habilitar herramienta en tu agente
 
 Ejemplo para el primer agente:
 
-```bat
-openclaw config set agents.list[0].tools.allow "[\"rag-search\"]" --strict-json
+### Windows / PowerShell
+
+```powershell
+openclaw config set agents.list[0].tools.allow '["rag-search"]' --strict-json
+```
+
+### Ubuntu / bash
+
+```bash
+openclaw config set 'agents.list[0].tools.allow' '["rag-search"]' --strict-json
+```
+
+Alternativa agregando entradas individuales:
+
+```bash
+openclaw config set 'agents.list[0].tools.allow[0]' group:core
+openclaw config set 'agents.list[0].tools.allow[1]' rag-search
 ```
 
 openclaw config set agents.list[0].tools.allow[0] group:core
@@ -56,8 +88,12 @@ openclaw config set agents.list[0].tools.allow[1] rag-search
 
 Si quieres conservar herramientas core ademas del plugin:
 
-```bat
-openclaw config set agents.list[0].tools.allow "[\"group:core\",\"rag-search\"]" --strict-json
+```powershell
+openclaw config set agents.list[0].tools.allow '["group:core","rag-search"]' --strict-json
+```
+
+```bash
+openclaw config set 'agents.list[0].tools.allow' '["group:core","rag-search"]' --strict-json
 ```
 
 ## 5) Reiniciar gateway
@@ -76,7 +112,7 @@ El agente podra llamar la tool `rag_search` y responder con los fragmentos recup
 
 ## 7) Agregar mas archivos al RAG
 
-Coloca tus documentos dentro de la carpeta `data/` del proyecto principal. Se admiten archivos `.pdf`, `.txt`, `.docx` y `.md`.
+Coloca tus documentos dentro de la carpeta `data/` del proyecto principal. Se admiten archivos `.pdf`, `.txt`, `.docx`, `.md`, `.csv` y `.xlsx`.
 
 El sistema ahora detecta automaticamente si cambiaste, agregaste o eliminaste archivos en `data/` y reconstruye el indice FAISS en la siguiente consulta. No necesitas reiniciar la API para eso.
 

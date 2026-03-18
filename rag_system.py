@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import gc
 import json
 import logging
@@ -10,6 +11,7 @@ from typing import Any, Callable, Iterator, List, Optional
 import fitz  # PyMuPDF
 from docx import Document as DocxDocument
 from langchain_community.vectorstores import FAISS
+from openpyxl import load_workbook
 from unstructured.partition.md import partition_md
 
 try:
@@ -40,7 +42,7 @@ CHUNK_SIZE = 900
 CHUNK_OVERLAP = 180
 TOP_K_DEFAULT = 4
 BATCH_SIZE = 128
-SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".docx", ".md"}
+SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".docx", ".md", ".csv", ".xlsx"}
 MANIFEST_FILENAME = "data_manifest.json"
 SEARCH_TYPE_DEFAULT = "similarity_with_score"
 MMR_FETCH_K_MULTIPLIER = 4
@@ -87,6 +89,49 @@ def _split_markdown_sections(raw_text: str) -> List[dict[str, Any]]:
             sections.append({"text": text, "metadata": {"section": current_heading}})
 
     return sections
+
+
+def _clean_tabular_row(row: dict[str, Any]) -> dict[str, str]:
+    cleaned: dict[str, str] = {}
+    for key, value in row.items():
+        if key is None:
+            continue
+        normalized_key = str(key).strip()
+        if not normalized_key:
+            continue
+        if value is None:
+            continue
+        normalized_value = str(value).strip()
+        if not normalized_value:
+            continue
+        cleaned[normalized_key] = normalized_value
+    return cleaned
+
+
+def _resolve_record_id(row: dict[str, str]) -> Optional[str]:
+    candidate_keys = (
+        "id",
+        "codigo",
+        "code",
+        "id_equipo",
+        "id_sensor",
+        "record_id",
+        "nombre",
+        "name",
+    )
+    lowered = {key.lower(): value for key, value in row.items()}
+    for candidate in candidate_keys:
+        value = lowered.get(candidate)
+        if value:
+            return value
+    return None
+
+
+def _build_tabular_text(prefix: str, row: dict[str, str]) -> str:
+    parts = [prefix]
+    for key, value in row.items():
+        parts.append(f"{key}: {value}.")
+    return " ".join(parts).strip()
 
 
 def _iter_supported_files(data_dir: Path) -> Iterator[Path]:
@@ -222,11 +267,75 @@ def _extract_md_segments(file_path: Path) -> List[dict[str, Any]]:
     return [{"text": text, "metadata": {}}] if text else []
 
 
+def _extract_csv_segments(file_path: Path) -> List[dict[str, Any]]:
+    segments: List[dict[str, Any]] = []
+    with file_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row_number, row in enumerate(reader, start=2):
+            clean_row = _clean_tabular_row(dict(row))
+            if not clean_row:
+                continue
+
+            text = _build_tabular_text("Registro de tabla CSV.", clean_row)
+            segments.append(
+                {
+                    "text": text,
+                    "metadata": {
+                        "table_name": file_path.stem,
+                        "row_number": row_number,
+                        "record_id": _resolve_record_id(clean_row),
+                    },
+                }
+            )
+
+    return segments
+
+
+def _extract_xlsx_segments(file_path: Path) -> List[dict[str, Any]]:
+    segments: List[dict[str, Any]] = []
+    workbook = load_workbook(filename=str(file_path), read_only=True, data_only=True)
+    try:
+        for sheet_name in workbook.sheetnames:
+            worksheet = workbook[sheet_name]
+            rows = list(worksheet.iter_rows(values_only=True))
+            if not rows:
+                continue
+
+            headers = [
+                str(value).strip() if value is not None and str(value).strip() else f"columna_{idx + 1}"
+                for idx, value in enumerate(rows[0])
+            ]
+
+            for row_number, values in enumerate(rows[1:], start=2):
+                clean_row = _clean_tabular_row(dict(zip(headers, values)))
+                if not clean_row:
+                    continue
+
+                text = _build_tabular_text(f"Registro de hoja {sheet_name}.", clean_row)
+                segments.append(
+                    {
+                        "text": text,
+                        "metadata": {
+                            "sheet": sheet_name,
+                            "table_name": file_path.stem,
+                            "row_number": row_number,
+                            "record_id": _resolve_record_id(clean_row),
+                        },
+                    }
+                )
+    finally:
+        workbook.close()
+
+    return segments
+
+
 EXTRACTORS: dict[str, Callable[[Path], List[dict[str, Any]]]] = {
     ".pdf": _extract_pdf_segments,
     ".txt": _extract_txt_segments,
     ".docx": _extract_docx_segments,
     ".md": _extract_md_segments,
+    ".csv": _extract_csv_segments,
+    ".xlsx": _extract_xlsx_segments,
 }
 
 
