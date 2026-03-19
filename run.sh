@@ -5,6 +5,7 @@ PY=".venv/bin/python3"
 PIP=".venv/bin/pip"
 SCRIPT="rag_system.py"
 API_SCRIPT="rag_api.py"
+WATCH_SCRIPT="watch_rag.py"
 DATA_DIR="data"
 INDEX_DIR="faiss_index"
 TOP_K="4"
@@ -16,8 +17,10 @@ usage() {
     echo "Uso: ./run.sh [comando]"
     echo "Comandos disponibles:"
     echo "  install   - Instala las dependencias"
+    echo "  ingest    - Actualiza el indice FAISS de forma incremental"
+    echo "  ingest-full - Reconstruye el indice FAISS completo"
+    echo "  watch     - Observa data/ y dispara ingesta incremental automatica"
     echo "  ask       - Realiza una consulta (ej: ./run.sh ask \"mi pregunta\")"
-    echo "  rebuild   - Reconstruye el índice y consulta"
     echo "  api       - Inicia el servidor API"
     echo "  help      - Muestra este mensaje"
     exit 1
@@ -40,6 +43,18 @@ case "$1" in
         $PIP install -r requirements.txt
         ;;
 
+    ingest)
+        $PY "$SCRIPT" --ingest --ingest-mode incremental --data-dir "$DATA_DIR" --index-dir "$INDEX_DIR" --chunk-size 900 --chunk-overlap 180
+        ;;
+
+    ingest-full)
+        $PY "$SCRIPT" --ingest --ingest-mode full --data-dir "$DATA_DIR" --index-dir "$INDEX_DIR" --chunk-size 900 --chunk-overlap 180
+        ;;
+
+    watch)
+        $PY "$WATCH_SCRIPT" --data-dir "$DATA_DIR" --index-dir "$INDEX_DIR" --debounce-seconds 10 --stability-seconds 2 --ingest-mode incremental
+        ;;
+
     ask)
         shift
         if [ -z "$1" ]; then
@@ -47,15 +62,6 @@ case "$1" in
             exit 1
         fi
         $PY "$SCRIPT" "$*" --data-dir "$DATA_DIR" --index-dir "$INDEX_DIR" --top-k "$TOP_K"
-        ;;
-
-    rebuild)
-        shift
-        if [ -z "$1" ]; then
-            echo "[ERROR] Debes enviar una consulta."
-            exit 1
-        fi
-        $PY "$SCRIPT" "$*" --data-dir "$DATA_DIR" --index-dir "$INDEX_DIR" --top-k "$TOP_K" --rebuild
         ;;
 
     api)

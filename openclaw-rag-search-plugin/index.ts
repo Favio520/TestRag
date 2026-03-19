@@ -1,11 +1,13 @@
 const PLUGIN_ID = "rag-search";
-const TOOL_NAME = "rag_search";
+const SEARCH_TOOL_NAME = "rag_search";
+const INGEST_TOOL_NAME = "rag_ingest";
 
 type PluginConfig = {
   baseUrl: string;
   timeoutMs: number;
   topK: number;
   searchType: "mmr" | "similarity" | "similarity_with_score";
+  modelName: string;
   chunkSize: number;
   chunkOverlap: number;
 };
@@ -15,6 +17,7 @@ const DEFAULT_CONFIG: PluginConfig = {
   timeoutMs: 30000,
   topK: 4,
   searchType: "similarity_with_score",
+  modelName: "sentence-transformers/all-MiniLM-L6-v2",
   chunkSize: 900,
   chunkOverlap: 180
 };
@@ -31,10 +34,10 @@ function clampChunkSize(value: unknown, fallback: number): number {
   return Math.max(100, Math.min(4000, Math.trunc(n)));
 }
 
-function clampChunkOverlap(value: unknown, fallback: number, chunkSize: number): number {
+function clampChunkOverlap(value: unknown, fallback: number): number {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
-  return Math.max(0, Math.min(chunkSize - 1, Math.trunc(n)));
+  return Math.max(0, Math.min(1000, Math.trunc(n)));
 }
 
 function resolveConfig(api: any): PluginConfig {
@@ -46,8 +49,7 @@ function resolveConfig(api: any): PluginConfig {
   const baseUrlRaw = raw.baseUrl;
   const timeoutRaw = raw.timeoutMs;
   const searchTypeRaw = raw.searchType;
-  const chunkSize = clampChunkSize(raw.chunkSize, DEFAULT_CONFIG.chunkSize);
-  const chunkOverlap = clampChunkOverlap(raw.chunkOverlap, DEFAULT_CONFIG.chunkOverlap, chunkSize);
+  const modelNameRaw = raw.modelName;
   const searchType =
     searchTypeRaw === "similarity" || searchTypeRaw === "similarity_with_score" || searchTypeRaw === "mmr"
       ? searchTypeRaw
@@ -61,8 +63,11 @@ function resolveConfig(api: any): PluginConfig {
       : DEFAULT_CONFIG.timeoutMs,
     topK: clampTopK(raw.topK, DEFAULT_CONFIG.topK),
     searchType,
-    chunkSize,
-    chunkOverlap
+    modelName: typeof modelNameRaw === "string" && modelNameRaw.trim()
+      ? modelNameRaw.trim()
+      : DEFAULT_CONFIG.modelName,
+    chunkSize: clampChunkSize(raw.chunkSize, DEFAULT_CONFIG.chunkSize),
+    chunkOverlap: clampChunkOverlap(raw.chunkOverlap, DEFAULT_CONFIG.chunkOverlap)
   };
 }
 
@@ -107,7 +112,7 @@ function formatResults(results: Array<{
 
 export default function register(api: any) {
   api.registerTool({
-    name: TOOL_NAME,
+    name: SEARCH_TOOL_NAME,
     label: "Buscar en manuales (RAG)",
     description: "Busca fragmentos relevantes en documentos locales indexados.",
     optional: true,
@@ -124,10 +129,6 @@ export default function register(api: any) {
           minimum: 1,
           maximum: 10,
           description: "Cantidad de fragmentos a recuperar."
-        },
-        rebuild: {
-          type: "boolean",
-          description: "Si true, reconstruye el indice antes de buscar."
         }
       },
       required: ["query"]
@@ -142,7 +143,6 @@ export default function register(api: any) {
       }
 
       const topK = clampTopK(params?.top_k, cfg.topK);
-      const rebuild = Boolean(params?.rebuild);
       const endpoint = `${cfg.baseUrl.replace(/\/+$/, "")}/search`;
 
       const controller = new AbortController();
@@ -155,8 +155,8 @@ export default function register(api: any) {
           body: JSON.stringify({
             query,
             top_k: topK,
-            rebuild,
             search_type: cfg.searchType,
+            model_name: cfg.modelName,
             chunk_size: cfg.chunkSize,
             chunk_overlap: cfg.chunkOverlap
           }),
@@ -182,6 +182,78 @@ export default function register(api: any) {
         const reason = error?.name === "AbortError"
           ? "Timeout consultando la API RAG."
           : `No se pudo consultar la API RAG: ${String(error?.message ?? error)}`;
+        return {
+          content: [{ type: "text", text: reason }]
+        };
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+  });
+
+  api.registerTool({
+    name: INGEST_TOOL_NAME,
+    label: "Actualizar indice RAG",
+    description: "Ejecuta la ingesta del indice RAG. Usa incremental por defecto y full solo cuando quieras reconstruir todo.",
+    optional: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        mode: {
+          type: "string",
+          enum: ["incremental", "full"],
+          description: "Modo de ingesta. Incremental agrega cambios nuevos; full reconstruye todo el indice."
+        }
+      }
+    },
+    async execute(_callId: string, params: any) {
+      const cfg = resolveConfig(api);
+      const mode = params?.mode === "full" ? "full" : "incremental";
+      const endpoint = `${cfg.baseUrl.replace(/\/+$/, "")}/ingest`;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), cfg.timeoutMs);
+
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mode,
+            model_name: cfg.modelName,
+            chunk_size: cfg.chunkSize,
+            chunk_overlap: cfg.chunkOverlap
+          }),
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          const body = await response.text();
+          return {
+            content: [{
+              type: "text",
+              text: `Error de ingesta RAG (${response.status}): ${body}`
+            }]
+          };
+        }
+
+        const data = await response.json();
+        const text = [
+          "Ingesta completada.",
+          `Modo: ${String(data?.mode ?? mode)}`,
+          `Documentos detectados: ${String(data?.documents ?? "n/a")}`,
+          `Archivos agregados: ${String(data?.added_files ?? 0)}`,
+          `Archivos actualizados: ${String(data?.updated_files ?? 0)}`,
+          `Archivos eliminados: ${String(data?.deleted_files ?? 0)}`
+        ].join("\n");
+        return {
+          content: [{ type: "text", text }]
+        };
+      } catch (error: any) {
+        const reason = error?.name === "AbortError"
+          ? "Timeout ejecutando la ingesta RAG."
+          : `No se pudo ejecutar la ingesta RAG: ${String(error?.message ?? error)}`;
         return {
           content: [{ type: "text", text: reason }]
         };

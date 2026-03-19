@@ -1,33 +1,50 @@
 # OpenClaw RAG Search Plugin
 
-Plugin local para OpenClaw que expone la herramienta `rag_search` y consulta la API HTTP del proyecto RAG.
+## RAG search focused on simple documents without advanced metadata
+## Fast search with an approximate cost of 45k tokens through OpenClaw
+## Supported document types: `csv`, `docx`, `md`, `pdf`, `txt`, `xlsx`
+## Supports up to 5 users asking at the same time
+## Stored FAISS data cannot be manually manipulated
+## Indexed data cannot be selectively removed from FAISS; it is removed only when reindexing
 
-## 1) Levantar API RAG
+Local OpenClaw plugin that exposes the `rag_search` tool and queries the RAG project's HTTP API.
 
-En la raiz de este repositorio:
+# Installation
+
+## 1) Start the RAG API
+
+From the root of this repository:
+
+Windows
 
 ```bat
 .\run.bat install
 .\run.bat api
 ```
 
-API esperada: `http://127.0.0.1:8000`
+Linux / macOS
 
-## 2) Instalar plugin en OpenClaw
+```sh
+./run.sh install
+./run.sh api
+```
+
+Expected API URL: `http://127.0.0.1:8000`
+
+## 2) Install the plugin in OpenClaw
 
 ```bat
 openclaw plugins install -l D:\RAG\openclaw-rag-search-plugin
-
 ```
 
-Si ya estaba instalado y quieres refrescar metadatos:
+If it is already installed and you want to refresh its metadata:
 
 ```bat
 openclaw plugins uninstall rag-search
 openclaw plugins install -l D:\RAG\openclaw-rag-search-plugin
 ```
 
-## 3) Configurar plugin
+## 3) Configure the plugin
 
 ### Windows / PowerShell
 
@@ -40,14 +57,13 @@ openclaw config set plugins.entries.rag-search.config.searchType mmr
 openclaw config set plugins.entries.rag-search.config.chunkSize 900 --strict-json
 openclaw config set plugins.entries.rag-search.config.chunkOverlap 180 --strict-json
 openclaw config set plugins.allow[0] rag-search
-
 ```
 
-Nota PowerShell: usa comillas simples `'...'` para JSON.
+PowerShell note: use single quotes `'...'` for JSON values.
 
 ### Ubuntu / bash
 
-En bash, los corchetes `[]` pueden ser interpretados por el shell. Pon la ruta completa entre comillas simples:
+In bash, square brackets `[]` may be interpreted by the shell. Put the full path in single quotes:
 
 ```bash
 openclaw config set 'plugins.entries.rag-search.enabled' true --strict-json
@@ -60,9 +76,9 @@ openclaw config set 'plugins.entries.rag-search.config.chunkOverlap' 180 --stric
 openclaw config set 'plugins.allow[0]' rag-search
 ```
 
-## 4) Habilitar herramienta en tu agente
+## 4) Enable the tool in your agent
 
-Ejemplo para el primer agente:
+Example for the first agent:
 
 ### Windows / PowerShell
 
@@ -76,17 +92,14 @@ openclaw config set agents.list[0].tools.allow '["rag-search"]' --strict-json
 openclaw config set 'agents.list[0].tools.allow' '["rag-search"]' --strict-json
 ```
 
-Alternativa agregando entradas individuales:
+Alternative by adding entries individually:
 
 ```bash
 openclaw config set 'agents.list[0].tools.allow[0]' group:core
 openclaw config set 'agents.list[0].tools.allow[1]' rag-search
 ```
 
-openclaw config set agents.list[0].tools.allow[0] group:core
-openclaw config set agents.list[0].tools.allow[1] rag-search
-
-Si quieres conservar herramientas core ademas del plugin:
+If you want to keep core tools in addition to the plugin:
 
 ```powershell
 openclaw config set agents.list[0].tools.allow '["group:core","rag-search"]' --strict-json
@@ -96,52 +109,50 @@ openclaw config set agents.list[0].tools.allow '["group:core","rag-search"]' --s
 openclaw config set 'agents.list[0].tools.allow' '["group:core","rag-search"]' --strict-json
 ```
 
-## 5) Reiniciar gateway
+## 5) Restart the gateway
 
 ```bat
 openclaw gateway restart
 ```
 
-## 6) Probar en chat
+## 6) Test it in chat
 
-Pregunta al agente algo de tus manuales, por ejemplo:
+Ask the agent something from your manuals, for example:
 
-`como se calibra el sensor de presion`
+`how do you calibrate the pressure sensor`
 
-El agente podra llamar la tool `rag_search` y responder con los fragmentos recuperados.
+The agent will be able to call the `rag_search` tool and respond using the retrieved fragments.
 
-## 7) Agregar mas archivos al RAG
+## 7) Add more files to the RAG
 
-Coloca tus documentos dentro de la carpeta `data/` del proyecto principal. Se admiten archivos `.pdf`, `.txt`, `.docx` y `.md`.
+Place your documents inside the `data/` folder in the main project. Supported file types are `.pdf`, `.txt`, `.docx`, `.md`, `.csv`, and `.xlsx`.
 
-El sistema ahora detecta automaticamente si cambiaste, agregaste o eliminaste archivos en `data/` y reconstruye el indice FAISS en la siguiente consulta. No necesitas reiniciar la API para eso.
+The current system can rebuild the FAISS index when new files are ingested. Depending on your current backend flow, you may need to run ingestion manually before searching.
 
-Si quieres forzar una reconstruccion manual de todos modos, puedes seguir usando `rebuild=true` desde la tool o el comando `run.bat rebuild`.
+## 8) Retrieval strategy
 
-## 8) Estrategia de recuperacion
+The plugin can choose the RAG retrieval strategy:
 
-El plugin ahora puede elegir la estrategia de recuperacion del RAG:
+- `mmr`: recommended by default, reduces repeated fragments
+- `similarity`: classic similarity search
+- `similarity_with_score`: same as similarity search, but the backend also keeps the score in metadata
 
-- `mmr`: recomendada por defecto, reduce fragmentos repetidos.
-- `similarity`: busqueda por similitud clasica.
-- `similarity_with_score`: igual que similitud, pero el backend conserva el score en metadatos.
-
-Ejemplo:
+Example:
 
 ```bat
 openclaw config set plugins.entries.rag-search.config.searchType mmr
 ```
 
-## 9) Chunking para manuales tecnicos
+## 9) Chunking for technical manuals
 
-El sistema ahora usa por defecto:
+The system currently uses these defaults:
 
 - `chunkSize = 900`
 - `chunkOverlap = 180`
 
-Estos valores suelen funcionar mejor en manuales tecnicos que un chunk muy pequeno, porque preservan mas contexto por fragmento.
+These values usually work better for technical manuals than very small chunks, because they preserve more context per fragment.
 
-Ejemplo:
+Example:
 
 ```bat
 openclaw config set plugins.entries.rag-search.config.chunkSize 900 --strict-json

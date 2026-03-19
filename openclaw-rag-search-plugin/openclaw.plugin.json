@@ -1,7 +1,7 @@
 {
   "id": "rag-search",
   "name": "RAG Search",
-  "description": "Consulta una API RAG local y devuelve fragmentos relevantes.",
+  "description": "Consulta una API RAG local y tambien permite disparar ingesta incremental o completa.",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -22,7 +22,7 @@
         "type": "integer",
         "minimum": 1,
         "maximum": 10,
-        "default": 3,
+        "default": 4,
         "description": "Numero de fragmentos por defecto."
       },
       "searchType": {
@@ -31,19 +31,24 @@
         "default": "similarity_with_score",
         "description": "Estrategia de recuperacion. MMR reduce fragmentos repetidos."
       },
+      "modelName": {
+        "type": "string",
+        "default": "sentence-transformers/all-MiniLM-L6-v2",
+        "description": "Modelo de embeddings que debe coincidir entre ingesta y busqueda."
+      },
       "chunkSize": {
         "type": "integer",
         "minimum": 100,
         "maximum": 4000,
         "default": 900,
-        "description": "Tamano de chunk para indexacion."
+        "description": "Tamano de chunk usado durante la ingesta y validado en busqueda."
       },
       "chunkOverlap": {
         "type": "integer",
         "minimum": 0,
         "maximum": 1000,
         "default": 180,
-        "description": "Solapamiento entre chunks consecutivos."
+        "description": "Solapamiento entre chunks usado durante la ingesta y validado en busqueda."
       }
     }
   }

@@ -8,7 +8,15 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from rag_system import CHUNK_OVERLAP, CHUNK_SIZE, SEARCH_TYPE_DEFAULT, TOP_K_DEFAULT, retrieve_top_fragments
+from rag_system import (
+    CHUNK_OVERLAP,
+    CHUNK_SIZE,
+    EMBEDDING_MODEL_NAME,
+    SEARCH_TYPE_DEFAULT,
+    TOP_K_DEFAULT,
+    ingest_documents,
+    retrieve_top_fragments,
+)
 
 
 logging.basicConfig(
@@ -28,12 +36,21 @@ app = FastAPI(
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Consulta del usuario.")
     top_k: int = Field(default=TOP_K_DEFAULT, ge=1, le=10)
-    rebuild: bool = False
     search_type: str = Field(default=SEARCH_TYPE_DEFAULT, pattern="^(mmr|similarity|similarity_with_score)$")
+    model_name: str = EMBEDDING_MODEL_NAME
     chunk_size: int = Field(default=CHUNK_SIZE, ge=100, le=4000)
     chunk_overlap: int = Field(default=CHUNK_OVERLAP, ge=0, le=1000)
     data_dir: str = "data"
     index_dir: str = "faiss_index"
+
+
+class IngestRequest(BaseModel):
+    data_dir: str = "data"
+    index_dir: str = "faiss_index"
+    model_name: str = EMBEDDING_MODEL_NAME
+    chunk_size: int = Field(default=CHUNK_SIZE, ge=100, le=4000)
+    chunk_overlap: int = Field(default=CHUNK_OVERLAP, ge=0, le=1000)
+    mode: str = Field(default="incremental", pattern="^(incremental|full)$")
 
 
 class SearchResult(BaseModel):
@@ -54,6 +71,20 @@ class SearchResponse(BaseModel):
     results: List[SearchResult]
 
 
+class IngestResponse(BaseModel):
+    status: str
+    mode: str
+    data_dir: str
+    index_dir: str
+    model_name: str
+    chunk_size: int
+    chunk_overlap: int
+    documents: int
+    added_files: int
+    updated_files: int
+    deleted_files: int
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -65,8 +96,33 @@ def root() -> dict[str, str]:
         "service": "rag-api",
         "status": "ok",
         "health": "/health",
+        "ingest": "POST /ingest",
         "search": "POST /search",
     }
+
+
+@app.post("/ingest", response_model=IngestResponse)
+def ingest(request: IngestRequest) -> IngestResponse:
+    try:
+        result = ingest_documents(
+            data_dir=request.data_dir,
+            index_dir=request.index_dir,
+            model_name=request.model_name,
+            chunk_size=request.chunk_size,
+            chunk_overlap=request.chunk_overlap,
+            mode=request.mode,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001 - API robusta
+        logger.exception("Error en ingesta RAG")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return IngestResponse(**result)
 
 
 @app.post("/search", response_model=SearchResponse)
@@ -77,7 +133,7 @@ def search(request: SearchRequest) -> SearchResponse:
             data_dir=request.data_dir,
             index_dir=request.index_dir,
             top_k=request.top_k,
-            rebuild=request.rebuild,
+            model_name=request.model_name,
             search_type=request.search_type,
             chunk_size=request.chunk_size,
             chunk_overlap=request.chunk_overlap,
@@ -86,6 +142,8 @@ def search(request: SearchRequest) -> SearchResponse:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001 - API robusta
         logger.exception("Error en recuperacion RAG")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
