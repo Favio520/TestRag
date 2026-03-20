@@ -20,7 +20,7 @@ usage() {
     echo "  ingest    - Actualiza el indice FAISS de forma incremental"
     echo "  ingest-full - Reconstruye el indice FAISS completo"
     echo "  watch     - Observa data/ y dispara ingesta incremental automatica"
-    echo "  ask       - Realiza una consulta (ej: ./run.sh ask \"mi pregunta\")"
+    echo "  ask       - Realiza una consulta (ej: ./run.sh ask \"mi pregunta\" --document manual.md)"
     echo "  api       - Inicia el servidor API"
     echo "  help      - Muestra este mensaje"
     exit 1
@@ -61,7 +61,36 @@ case "$1" in
             echo "[ERROR] Debes enviar una consulta."
             exit 1
         fi
-        $PY "$SCRIPT" "$*" --data-dir "$DATA_DIR" --index-dir "$INDEX_DIR" --top-k "$TOP_K"
+        DOCUMENT=""
+        QUERY_PARTS=()
+        while [ "$#" -gt 0 ]; do
+            case "$1" in
+                --document)
+                    shift
+                    if [ -z "$1" ]; then
+                        echo "[ERROR] Debes indicar un documento despues de --document."
+                        exit 1
+                    fi
+                    DOCUMENT="$1"
+                    ;;
+                *)
+                    QUERY_PARTS+=("$1")
+                    ;;
+            esac
+            shift
+        done
+
+        QUERY="${QUERY_PARTS[*]}"
+        if [ -z "$QUERY" ]; then
+            echo "[ERROR] Debes enviar una consulta."
+            exit 1
+        fi
+
+        CMD=("$PY" "$SCRIPT" "$QUERY" --data-dir "$DATA_DIR" --index-dir "$INDEX_DIR" --top-k "$TOP_K")
+        if [ -n "$DOCUMENT" ]; then
+            CMD+=(--document "$DOCUMENT")
+        fi
+        "${CMD[@]}"
         ;;
 
     api)

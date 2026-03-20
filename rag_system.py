@@ -10,6 +10,8 @@ from rag.config import (
     CHUNK_SIZE,
     EMBEDDING_MODEL_NAME,
     INGEST_MODE_DEFAULT,
+    NO_EVIDENCE_SCORE_THRESHOLD,
+    RERANK_DEFAULT,
     SEARCH_TYPE_DEFAULT,
     TOP_K_DEFAULT,
 )
@@ -37,6 +39,9 @@ def retrieve_top_fragments(
     search_type: str = SEARCH_TYPE_DEFAULT,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
+    document: str | None = None,
+    rerank: bool = RERANK_DEFAULT,
+    score_threshold: float | None = NO_EVIDENCE_SCORE_THRESHOLD,
 ) -> List[Document]:
     if not query or not query.strip():
         raise ValueError("La consulta no puede estar vacia.")
@@ -53,6 +58,9 @@ def retrieve_top_fragments(
         query=query.strip(),
         top_k=top_k,
         search_type=search_type,
+        document=document,
+        rerank=rerank,
+        score_threshold=score_threshold,
     )
 
 
@@ -64,6 +72,9 @@ def main(
     search_type: str = SEARCH_TYPE_DEFAULT,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
+    document: str | None = None,
+    rerank: bool = RERANK_DEFAULT,
+    score_threshold: float | None = NO_EVIDENCE_SCORE_THRESHOLD,
 ) -> List[str]:
     docs = retrieve_top_fragments(
         query=query,
@@ -73,6 +84,9 @@ def main(
         search_type=search_type,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
+        document=document,
+        rerank=rerank,
+        score_threshold=score_threshold,
     )
     return [doc.page_content for doc in docs]
 
@@ -111,8 +125,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--search-type",
         default=SEARCH_TYPE_DEFAULT,
-        choices=["mmr", "similarity", "similarity_with_score"],
-        help="Estrategia de recuperacion: mmr reduce redundancia entre fragmentos.",
+        choices=["mmr", "similarity", "similarity_with_score", "hybrid"],
+        help="Estrategia de recuperacion: mmr reduce redundancia; hybrid mezcla FAISS con una capa lexical.",
     )
     parser.add_argument(
         "--chunk-size",
@@ -125,6 +139,22 @@ if __name__ == "__main__":
         type=int,
         default=CHUNK_OVERLAP,
         help="Solapamiento entre chunks para preservar continuidad entre secciones.",
+    )
+    parser.add_argument(
+        "--document",
+        default=None,
+        help="Filtro opcional por documento. Acepta nombre de archivo, ruta relativa o titulo del documento.",
+    )
+    parser.add_argument(
+        "--rerank",
+        action="store_true",
+        help="Aplica una segunda pasada de reranking sobre los mejores candidatos recuperados.",
+    )
+    parser.add_argument(
+        "--score-threshold",
+        type=float,
+        default=NO_EVIDENCE_SCORE_THRESHOLD,
+        help="Umbral minimo de evidencia. Si el mejor resultado cae por debajo, se devuelve vacio.",
     )
 
     args = parser.parse_args()
@@ -150,6 +180,9 @@ if __name__ == "__main__":
             search_type=args.search_type,
             chunk_size=args.chunk_size,
             chunk_overlap=args.chunk_overlap,
+            document=args.document,
+            rerank=args.rerank,
+            score_threshold=args.score_threshold,
         )
 
         print("\nTop fragmentos relevantes:\n")

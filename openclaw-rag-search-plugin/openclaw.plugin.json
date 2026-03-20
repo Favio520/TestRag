@@ -27,9 +27,21 @@
       },
       "searchType": {
         "type": "string",
-        "enum": ["mmr", "similarity", "similarity_with_score"],
-        "default": "similarity_with_score",
-        "description": "Estrategia de recuperacion. MMR reduce fragmentos repetidos."
+        "enum": ["mmr", "similarity", "similarity_with_score", "hybrid"],
+        "default": "mmr",
+        "description": "Estrategia de recuperacion. Hybrid mezcla vector search con una capa lexical."
+      },
+      "rerank": {
+        "type": "boolean",
+        "default": false,
+        "description": "Si true, aplica una segunda pasada de reranking sobre los mejores candidatos."
+      },
+      "scoreThreshold": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1,
+        "default": 0.35,
+        "description": "Umbral minimo de evidencia. Si el mejor resultado cae por debajo, se devuelve vacio."
       },
       "modelName": {
         "type": "string",

@@ -129,21 +129,39 @@ Place your documents inside the `data/` folder in the main project. Supported fi
 
 The current system can rebuild the FAISS index when new files are ingested. Depending on your current backend flow, you may need to run ingestion manually before searching.
 
-## 8) Retrieval strategy
+## 8) Optional document filter
+
+The search endpoint and the `rag_search` tool accept an optional `document` field. You can use it to restrict retrieval to a single file by name, relative path, or title.
+
+Examples:
+
+- `manual_bomba_hidraulica.md`
+- `subfolder/manual_bomba_hidraulica.md`
+- `manual_bomba_hidraulica`
+
+## 9) Retrieval strategy
 
 The plugin can choose the RAG retrieval strategy:
 
 - `mmr`: recommended by default, reduces repeated fragments
 - `similarity`: classic similarity search
 - `similarity_with_score`: same as similarity search, but the backend also keeps the score in metadata
+- `hybrid`: combines vector retrieval with a lexical layer, which is useful for exact names, codes, and technical terms
+
+The backend also supports:
+
+- `scoreThreshold`: if the best result is too weak, the RAG returns no evidence instead of forcing a bad answer
+- `rerank`: applies a second ranking pass over the best candidates and usually improves final ordering
 
 Example:
 
 ```bat
 openclaw config set plugins.entries.rag-search.config.searchType mmr
+openclaw config set plugins.entries.rag-search.config.scoreThreshold 0.35 --strict-json
+openclaw config set plugins.entries.rag-search.config.rerank true --strict-json
 ```
 
-## 9) Chunking for technical manuals
+## 10) Chunking for technical manuals
 
 The system currently uses these defaults:
 

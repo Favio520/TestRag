@@ -57,11 +57,41 @@ exit /b %ERRORLEVEL%
 shift
 if "%~1"=="" (
     echo [ERROR] Debes enviar una consulta.
-    echo Ejemplo: run.bat ask "como se calibra el sensor"
+    echo Ejemplo: run.bat ask "como se calibra el sensor" --document manual_bomba_hidraulica.md
     exit /b 1
 )
-set "QUERY=%*"
-"%PY%" "%SCRIPT%" "%QUERY%" --data-dir "%DATA_DIR%" --index-dir "%INDEX_DIR%" --top-k %TOP_K%
+set "QUERY="
+set "DOCUMENT="
+:ask_parse
+if "%~1"=="" goto :ask_run
+if /I "%~1"=="--document" (
+    shift
+    if "%~1"=="" (
+        echo [ERROR] Debes indicar un documento despues de --document.
+        exit /b 1
+    )
+    set "DOCUMENT=%~1"
+    shift
+    goto :ask_parse
+)
+if defined QUERY (
+    set "QUERY=%QUERY% %~1"
+) else (
+    set "QUERY=%~1"
+)
+shift
+goto :ask_parse
+
+:ask_run
+if not defined QUERY (
+    echo [ERROR] Debes enviar una consulta.
+    exit /b 1
+)
+if defined DOCUMENT (
+    "%PY%" "%SCRIPT%" "%QUERY%" --data-dir "%DATA_DIR%" --index-dir "%INDEX_DIR%" --top-k %TOP_K% --document "%DOCUMENT%"
+) else (
+    "%PY%" "%SCRIPT%" "%QUERY%" --data-dir "%DATA_DIR%" --index-dir "%INDEX_DIR%" --top-k %TOP_K%
+)
 exit /b %ERRORLEVEL%
 
 :api
@@ -74,7 +104,7 @@ echo   run.bat install
 echo   run.bat ingest
 echo   run.bat ingest-full
 echo   run.bat watch
-echo   run.bat ask "tu consulta"
+echo   run.bat ask "tu consulta" --document manual.md
 echo   run.bat api
 echo.
 echo Comandos:
