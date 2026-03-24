@@ -87,6 +87,7 @@ function resolveConfig(api: any): PluginConfig {
 function formatResults(results: Array<{
   content: string;
   source?: string;
+  relative_source?: string;
   source_name?: string;
   title?: string;
   doc_type?: string;
@@ -108,7 +109,7 @@ function formatResults(results: Array<{
   const lines: string[] = [];
   results.forEach((item, idx) => {
     const source = item.source ?? "desconocido";
-    const sourceName = item.source_name ?? source;
+    const sourceName = item.relative_source ?? item.source_name ?? source;
     const chunk = item.chunk_id ?? "n/a";
     const metaParts = [
       `Fuente: ${sourceName}`,
@@ -147,6 +148,10 @@ export default function register(api: any) {
           type: "string",
           description: "Consulta del usuario."
         },
+        folder: {
+          type: "string",
+          description: "Filtro opcional por carpeta o proyecto. Acepta una carpeta raiz o una ruta relativa parcial."
+        },
         document: {
           type: "string",
           description: "Filtro opcional por documento. Acepta nombre de archivo, ruta relativa o titulo."
@@ -170,6 +175,7 @@ export default function register(api: any) {
       }
 
       const topK = clampTopK(params?.top_k, cfg.topK);
+      const folder = typeof params?.folder === "string" ? params.folder.trim() : "";
       const document = typeof params?.document === "string" ? params.document.trim() : "";
       const endpoint = `${cfg.baseUrl.replace(/\/+$/, "")}/search`;
 
@@ -182,6 +188,7 @@ export default function register(api: any) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             query,
+            folder: folder || undefined,
             document: document || undefined,
             top_k: topK,
             search_type: cfg.searchType,

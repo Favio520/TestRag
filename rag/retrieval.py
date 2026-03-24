@@ -70,6 +70,54 @@ def build_document_filter(document: Optional[str]) -> Optional[Callable[[dict[st
     return metadata_matches
 
 
+def build_folder_filter(folder: Optional[str]) -> Optional[Callable[[dict[str, Any]], bool]]:
+    normalized_folder = normalize_document_value(folder or "").strip("/")
+    if not normalized_folder:
+        return None
+
+    folder_parts = PurePosixPath(normalized_folder).parts
+    folder_is_single_segment = len(folder_parts) == 1
+
+    def metadata_matches(metadata: dict[str, Any]) -> bool:
+        for field in ("relative_source", "source"):
+            raw_value = metadata.get(field)
+            if not raw_value:
+                continue
+
+            normalized_value = normalize_document_value(raw_value)
+            if not normalized_value:
+                continue
+
+            path = PurePosixPath(normalized_value)
+            parent = normalize_document_value(path.parent.as_posix()).strip("./")
+            if not parent:
+                continue
+
+            if parent == normalized_folder or parent.startswith(f"{normalized_folder}/"):
+                return True
+
+            if folder_is_single_segment and folder_parts[0] in path.parent.parts:
+                return True
+
+        return False
+
+    return metadata_matches
+
+
+def compose_metadata_filter(
+    document: Optional[str] = None,
+    folder: Optional[str] = None,
+) -> Optional[Callable[[dict[str, Any]], bool]]:
+    filters = [candidate for candidate in (build_document_filter(document), build_folder_filter(folder)) if candidate]
+    if not filters:
+        return None
+
+    def metadata_matches(metadata: dict[str, Any]) -> bool:
+        return all(filter_fn(metadata) for filter_fn in filters)
+
+    return metadata_matches
+
+
 def document_key(doc: Document) -> str:
     metadata = doc.metadata
     return str(
@@ -311,11 +359,12 @@ def retrieve_with_strategy(
     top_k: int,
     search_type: str = SEARCH_TYPE_DEFAULT,
     document: Optional[str] = None,
+    folder: Optional[str] = None,
     rerank: bool = RERANK_DEFAULT,
     score_threshold: Optional[float] = NO_EVIDENCE_SCORE_THRESHOLD,
 ) -> List[Document]:
     normalized_search_type = search_type.strip().lower()
-    document_filter = build_document_filter(document)
+    metadata_filter = compose_metadata_filter(document=document, folder=folder)
     result_k = max(top_k, RERANK_TOP_N) if rerank else top_k
     vector_fetch_k = max(result_k, result_k * MMR_FETCH_K_MULTIPLIER)
 
@@ -326,11 +375,11 @@ def retrieve_with_strategy(
             query=query,
             k=hybrid_fetch_k,
             fetch_k=hybrid_fetch_k,
-            document_filter=document_filter,
+            document_filter=metadata_filter,
         )
         lexical_candidates = compute_lexical_candidates(
             query,
-            get_all_documents(vector_store, document_filter=document_filter),
+            get_all_documents(vector_store, document_filter=metadata_filter),
         )[:hybrid_fetch_k]
         results = merge_hybrid_candidates(vector_candidates, lexical_candidates)
         best_score = float(results[0].metadata.get("score", 0.0)) if results else None
@@ -340,7 +389,7 @@ def retrieve_with_strategy(
             query=query,
             k=result_k,
             fetch_k=vector_fetch_k,
-            document_filter=document_filter,
+            document_filter=metadata_filter,
         )
         best_score = float(results[0].metadata.get("score", 0.0)) if results else None
     elif normalized_search_type == "similarity_with_score":
@@ -349,7 +398,7 @@ def retrieve_with_strategy(
             query=query,
             k=result_k,
             fetch_k=vector_fetch_k,
-            document_filter=document_filter,
+            document_filter=metadata_filter,
         )
         best_score = float(results[0].metadata.get("score", 0.0)) if results else None
     else:
@@ -358,7 +407,7 @@ def retrieve_with_strategy(
             query=query,
             k=vector_fetch_k,
             fetch_k=vector_fetch_k,
-            document_filter=document_filter,
+            document_filter=metadata_filter,
         )
         best_score = float(vector_candidates[0].metadata.get("score", 0.0)) if vector_candidates else None
         vector_scores_by_key = {
@@ -375,7 +424,7 @@ def retrieve_with_strategy(
             k=result_k,
             fetch_k=vector_fetch_k,
             lambda_mult=MMR_LAMBDA_MULT,
-            filter=document_filter,
+            filter=metadata_filter,
         )
         for doc in results:
             score_payload = vector_scores_by_key.get(document_key(doc), {})

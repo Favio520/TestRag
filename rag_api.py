@@ -40,6 +40,7 @@ class SearchRequest(BaseModel):
     top_k: int = Field(default=TOP_K_DEFAULT, ge=1, le=10)
     search_type: str = Field(default=SEARCH_TYPE_DEFAULT, pattern="^(mmr|similarity|similarity_with_score|hybrid)$")
     document: str | None = Field(default=None, description="Filtro opcional por documento.")
+    folder: str | None = Field(default=None, description="Filtro opcional por carpeta o proyecto.")
     rerank: bool = RERANK_DEFAULT
     score_threshold: float | None = Field(default=NO_EVIDENCE_SCORE_THRESHOLD, ge=0.0, le=1.0)
     model_name: str = EMBEDDING_MODEL_NAME
@@ -61,6 +62,7 @@ class IngestRequest(BaseModel):
 class SearchResult(BaseModel):
     content: str
     source: str
+    relative_source: str | None = None
     chunk_id: int | str
     source_name: str | None = None
     title: str | None = None
@@ -149,6 +151,7 @@ def search(request: SearchRequest) -> SearchResponse:
             chunk_size=request.chunk_size,
             chunk_overlap=request.chunk_overlap,
             document=request.document,
+            folder=request.folder,
             rerank=request.rerank,
             score_threshold=request.score_threshold,
         )
@@ -166,6 +169,7 @@ def search(request: SearchRequest) -> SearchResponse:
         SearchResult(
             content=doc.page_content,
             source=str(doc.metadata.get("source", "desconocido")),
+            relative_source=doc.metadata.get("relative_source"),
             chunk_id=doc.metadata.get("chunk_id", "n/a"),
             source_name=doc.metadata.get("source_name"),
             title=doc.metadata.get("title"),

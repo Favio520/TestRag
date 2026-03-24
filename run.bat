@@ -57,11 +57,12 @@ exit /b %ERRORLEVEL%
 shift
 if "%~1"=="" (
     echo [ERROR] Debes enviar una consulta.
-    echo Ejemplo: run.bat ask "como se calibra el sensor" --document manual_bomba_hidraulica.md
+    echo Ejemplo: run.bat ask "como se calibra el sensor" --folder BESSDailyreport --document manual_bomba_hidraulica.md
     exit /b 1
 )
 set "QUERY="
 set "DOCUMENT="
+set "FOLDER="
 :ask_parse
 if "%~1"=="" goto :ask_run
 if /I "%~1"=="--document" (
@@ -71,6 +72,16 @@ if /I "%~1"=="--document" (
         exit /b 1
     )
     set "DOCUMENT=%~1"
+    shift
+    goto :ask_parse
+)
+if /I "%~1"=="--folder" (
+    shift
+    if "%~1"=="" (
+        echo [ERROR] Debes indicar una carpeta despues de --folder.
+        exit /b 1
+    )
+    set "FOLDER=%~1"
     shift
     goto :ask_parse
 )
@@ -87,11 +98,22 @@ if not defined QUERY (
     echo [ERROR] Debes enviar una consulta.
     exit /b 1
 )
-if defined DOCUMENT (
-    "%PY%" "%SCRIPT%" "%QUERY%" --data-dir "%DATA_DIR%" --index-dir "%INDEX_DIR%" --top-k %TOP_K% --document "%DOCUMENT%"
-) else (
-    "%PY%" "%SCRIPT%" "%QUERY%" --data-dir "%DATA_DIR%" --index-dir "%INDEX_DIR%" --top-k %TOP_K%
-)
+if defined FOLDER goto :ask_with_folder
+if defined DOCUMENT goto :ask_with_document
+"%PY%" "%SCRIPT%" "%QUERY%" --data-dir "%DATA_DIR%" --index-dir "%INDEX_DIR%" --top-k %TOP_K%
+exit /b %ERRORLEVEL%
+
+:ask_with_folder
+if defined DOCUMENT goto :ask_with_folder_and_document
+"%PY%" "%SCRIPT%" "%QUERY%" --data-dir "%DATA_DIR%" --index-dir "%INDEX_DIR%" --top-k %TOP_K% --folder "%FOLDER%"
+exit /b %ERRORLEVEL%
+
+:ask_with_document
+"%PY%" "%SCRIPT%" "%QUERY%" --data-dir "%DATA_DIR%" --index-dir "%INDEX_DIR%" --top-k %TOP_K% --document "%DOCUMENT%"
+exit /b %ERRORLEVEL%
+
+:ask_with_folder_and_document
+"%PY%" "%SCRIPT%" "%QUERY%" --data-dir "%DATA_DIR%" --index-dir "%INDEX_DIR%" --top-k %TOP_K% --folder "%FOLDER%" --document "%DOCUMENT%"
 exit /b %ERRORLEVEL%
 
 :api
@@ -104,7 +126,7 @@ echo   run.bat install
 echo   run.bat ingest
 echo   run.bat ingest-full
 echo   run.bat watch
-echo   run.bat ask "tu consulta" --document manual.md
+echo   run.bat ask "tu consulta" --folder BESSDailyreport --document manual.md
 echo   run.bat api
 echo.
 echo Comandos:

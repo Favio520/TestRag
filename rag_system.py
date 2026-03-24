@@ -40,6 +40,7 @@ def retrieve_top_fragments(
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
     document: str | None = None,
+    folder: str | None = None,
     rerank: bool = RERANK_DEFAULT,
     score_threshold: float | None = NO_EVIDENCE_SCORE_THRESHOLD,
 ) -> List[Document]:
@@ -59,6 +60,7 @@ def retrieve_top_fragments(
         top_k=top_k,
         search_type=search_type,
         document=document,
+        folder=folder,
         rerank=rerank,
         score_threshold=score_threshold,
     )
@@ -73,6 +75,7 @@ def main(
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
     document: str | None = None,
+    folder: str | None = None,
     rerank: bool = RERANK_DEFAULT,
     score_threshold: float | None = NO_EVIDENCE_SCORE_THRESHOLD,
 ) -> List[str]:
@@ -85,6 +88,7 @@ def main(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         document=document,
+        folder=folder,
         rerank=rerank,
         score_threshold=score_threshold,
     )
@@ -146,6 +150,11 @@ if __name__ == "__main__":
         help="Filtro opcional por documento. Acepta nombre de archivo, ruta relativa o titulo del documento.",
     )
     parser.add_argument(
+        "--folder",
+        default=None,
+        help="Filtro opcional por carpeta o proyecto. Acepta una carpeta raiz o una ruta relativa parcial, por ejemplo BESSDailyreport o cliente/proyecto.",
+    )
+    parser.add_argument(
         "--rerank",
         action="store_true",
         help="Aplica una segunda pasada de reranking sobre los mejores candidatos recuperados.",
@@ -181,6 +190,7 @@ if __name__ == "__main__":
             chunk_size=args.chunk_size,
             chunk_overlap=args.chunk_overlap,
             document=args.document,
+            folder=args.folder,
             rerank=args.rerank,
             score_threshold=args.score_threshold,
         )

@@ -20,7 +20,7 @@ usage() {
     echo "  ingest    - Actualiza el indice FAISS de forma incremental"
     echo "  ingest-full - Reconstruye el indice FAISS completo"
     echo "  watch     - Observa data/ y dispara ingesta incremental automatica"
-    echo "  ask       - Realiza una consulta (ej: ./run.sh ask \"mi pregunta\" --document manual.md)"
+    echo "  ask       - Realiza una consulta (ej: ./run.sh ask \"mi pregunta\" --folder BESSDailyreport --document manual.md)"
     echo "  api       - Inicia el servidor API"
     echo "  help      - Muestra este mensaje"
     exit 1
@@ -62,6 +62,7 @@ case "$1" in
             exit 1
         fi
         DOCUMENT=""
+        FOLDER=""
         QUERY_PARTS=()
         while [ "$#" -gt 0 ]; do
             case "$1" in
@@ -72,6 +73,14 @@ case "$1" in
                         exit 1
                     fi
                     DOCUMENT="$1"
+                    ;;
+                --folder)
+                    shift
+                    if [ -z "$1" ]; then
+                        echo "[ERROR] Debes indicar una carpeta despues de --folder."
+                        exit 1
+                    fi
+                    FOLDER="$1"
                     ;;
                 *)
                     QUERY_PARTS+=("$1")
@@ -87,6 +96,9 @@ case "$1" in
         fi
 
         CMD=("$PY" "$SCRIPT" "$QUERY" --data-dir "$DATA_DIR" --index-dir "$INDEX_DIR" --top-k "$TOP_K")
+        if [ -n "$FOLDER" ]; then
+            CMD+=(--folder "$FOLDER")
+        fi
         if [ -n "$DOCUMENT" ]; then
             CMD+=(--document "$DOCUMENT")
         fi

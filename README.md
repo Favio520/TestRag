@@ -129,12 +129,16 @@ Place your documents inside the `data/` folder in the main project. Supported fi
 
 The current system can rebuild the FAISS index when new files are ingested. Depending on your current backend flow, you may need to run ingestion manually before searching.
 
-## 8) Optional document filter
+## 8) Optional document and folder filters
 
-The search endpoint and the `rag_search` tool accept an optional `document` field. You can use it to restrict retrieval to a single file by name, relative path, or title.
+The search endpoint and the `rag_search` tool accept optional `document` and `folder` fields.
+
+- `document` restricts retrieval to a single file by name, relative path, or title
+- `folder` restricts retrieval to a project folder or relative folder path, for example `BESSDailyreport`
 
 Examples:
 
+- `BESSDailyreport`
 - `manual_bomba_hidraulica.md`
 - `subfolder/manual_bomba_hidraulica.md`
 - `manual_bomba_hidraulica`
