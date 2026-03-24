@@ -1,11 +1,11 @@
 # OpenClaw RAG Search Plugin
 
-## RAG search focused on simple documents without advanced metadata
-## Fast search with an approximate cost of 45k tokens through OpenClaw
-## Supported document types: `csv`, `docx`, `md`, `pdf`, `txt`, `xlsx`
-## Supports up to 5 users asking at the same time
-## Stored FAISS data cannot be manually manipulated
-## Indexed data cannot be selectively removed from FAISS; it is removed only when reindexing
+- RAG search focused on simple documents without advanced metadata
+- Fast search with an approximate cost of 40k tokens through OpenClaw
+- Supported document types: `csv`, `docx`, `md`, `pdf`, `txt`, `xlsx`
+- Supports up to 5 users asking at the same time
+- Stored FAISS data cannot be manually manipulated
+- Indexed data cannot be selectively removed from FAISS; it is removed only when reindexing
 
 Local OpenClaw plugin that exposes the `rag_search` tool and queries the RAG project's HTTP API.
 
@@ -34,14 +34,14 @@ Expected API URL: `http://127.0.0.1:8000`
 ## 2) Install the plugin in OpenClaw
 
 ```bat
-openclaw plugins install -l D:\RAG\openclaw-rag-search-plugin
+openclaw plugins install -l FAISS-RAG/openclaw-rag-search-plugin
 ```
 
 If it is already installed and you want to refresh its metadata:
 
 ```bat
 openclaw plugins uninstall rag-search
-openclaw plugins install -l D:\RAG\openclaw-rag-search-plugin
+openclaw plugins install -l FAISS-RAG/openclaw-rag-search-plugin
 ```
 
 ## 3) Configure the plugin
@@ -53,7 +53,7 @@ openclaw config set plugins.entries.rag-search.enabled true --strict-json
 openclaw config set plugins.entries.rag-search.config.baseUrl http://127.0.0.1:8000
 openclaw config set plugins.entries.rag-search.config.topK 3 --strict-json
 openclaw config set plugins.entries.rag-search.config.timeoutMs 30000 --strict-json
-openclaw config set plugins.entries.rag-search.config.searchType mmr
+openclaw config set plugins.entries.rag-search.config.searchType hybrid
 openclaw config set plugins.entries.rag-search.config.chunkSize 900 --strict-json
 openclaw config set plugins.entries.rag-search.config.chunkOverlap 180 --strict-json
 openclaw config set plugins.allow[0] rag-search
@@ -70,7 +70,7 @@ openclaw config set 'plugins.entries.rag-search.enabled' true --strict-json
 openclaw config set 'plugins.entries.rag-search.config.baseUrl' http://127.0.0.1:8000
 openclaw config set 'plugins.entries.rag-search.config.topK' 3 --strict-json
 openclaw config set 'plugins.entries.rag-search.config.timeoutMs' 30000 --strict-json
-openclaw config set 'plugins.entries.rag-search.config.searchType' mmr
+openclaw config set 'plugins.entries.rag-search.config.searchType' hybrid
 openclaw config set 'plugins.entries.rag-search.config.chunkSize' 900 --strict-json
 openclaw config set 'plugins.entries.rag-search.config.chunkOverlap' 180 --strict-json
 openclaw config set 'plugins.allow[0]' rag-search
